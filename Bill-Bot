@@ -1,0 +1,37 @@
+from discord.ext import tasks
+import discord
+import random
+from discord.ext import commands
+import asyncio
+
+intents = discord.Intents.default()
+intents.message_content = True
+
+TOKEN = "TU TOKEN AQUI"
+
+class MyClient(discord.Client):
+    async def on_ready(self):
+        print(f'Conectado como {self.user} (ID: {self.user.id})')
+        print('------')
+
+    async def on_message(self, message):
+        if message.author == self.user:
+            return
+
+        saludos = ["Hola", "hola", "¿Cómo estás?", "¿Qué tal?", "¡Ey!", "¡Hey!", "¡Qué onda!"]
+        emojis = ["👋", "😉", "🙂", "😁", "😎", "😃"]
+
+        if message.content in saludos:
+            await message.channel.send(f"{random.choice(saludos)} {message.author.name} {random.choice(emojis)}!")
+
+        if message.content.startswith('!editme'):
+            msg = await message.channel.send(content=random.randint(1, 100))
+            await asyncio.sleep(3.0)
+            await msg.edit(content=random.randint(1, 100))
+
+    async def on_message_edit(self, before, after):
+        msg = f'**{before.author}** editó su mensaje:\n{before.content} -> {after.content}'
+        await before.channel.send(msg)
+
+client = MyClient(intents=intents)
+client.run(TOKEN)
