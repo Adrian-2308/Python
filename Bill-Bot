@@ -1,37 +1,141 @@
-from discord.ext import tasks
 import discord
 import random
 from discord.ext import commands
 import asyncio
+import os
+import requests
+import traceback
+import typing
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-TOKEN = "TU TOKEN AQUI"
+bot = commands.Bot(command_prefix='/', intents=intents)
 
-class MyClient(discord.Client):
-    async def on_ready(self):
-        print(f'Conectado como {self.user} (ID: {self.user.id})')
-        print('------')
+TOKEN = "TU TOKEN AQUÍ"
 
-    async def on_message(self, message):
-        if message.author == self.user:
-            return
+@bot.event
+async def on_ready():
+    print(f'Conectado como {bot.user} (ID: {bot.user.id})')
+    print('------')
 
-        saludos = ["Hola", "hola", "¿Cómo estás?", "¿Qué tal?", "¡Ey!", "¡Hey!", "¡Qué onda!"]
-        emojis = ["👋", "😉", "🙂", "😁", "😎", "😃"]
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
 
-        if message.content in saludos:
-            await message.channel.send(f"{random.choice(saludos)} {message.author.name} {random.choice(emojis)}!")
+    saludos = ["Hola", "hola", "¿Cómo estás?", "¿Qué tal?", "¡Ey!", "¡Hey!", "¡Qué onda!"]
+    emojis = ["👋", "😉", "🙂", "😁", "😎", "😃"]
 
-        if message.content.startswith('!editme'):
-            msg = await message.channel.send(content=random.randint(1, 100))
-            await asyncio.sleep(3.0)
-            await msg.edit(content=random.randint(1, 100))
+    if message.content in saludos:
+        await message.channel.send(f"{random.choice(saludos)} {message.author.name} {random.choice(emojis)}!")
 
-    async def on_message_edit(self, before, after):
-        msg = f'**{before.author}** editó su mensaje:\n{before.content} -> {after.content}'
-        await before.channel.send(msg)
+    if message.content.startswith('!editme'):
+        msg = await message.channel.send(content=random.randint(1, 100))
+        await asyncio.sleep(3.0)
+        await msg.edit(content=random.randint(1, 100))
 
-client = MyClient(intents=intents)
-client.run(TOKEN)
+    await bot.process_commands(message)
+
+@bot.event
+async def on_message_edit(before, after):
+    msg = f'**{before.author}** editó su mensaje:\n{before.content} -> {after.content}'
+    await before.channel.send(msg)
+
+@bot.command()
+async def meme(ctx):
+    img_meme = random.choice(os.listdir("images"))
+    with open(f'images/{img_meme}', 'rb') as file:
+        picture = discord.File(file)
+    await ctx.send(file=picture)
+
+def get_duck_image_url():    
+    url = 'https://random-d.uk/api/random'
+    res = requests.get(url)
+    data = res.json()
+    return data['url']
+
+@bot.command()
+async def duck(ctx):
+    image_url = get_duck_image_url()
+    await ctx.send(image_url)
+
+@bot.command()
+async def cat(ctx):
+    img_cat = random.choice(os.listdir("cat"))
+    with open(f'cat/{img_cat}', 'rb') as file:
+        picture = discord.File(file)
+    await ctx.send(file=picture)
+
+@bot.command()
+async def userinfo(ctx: commands.Context, user: discord.User):
+    user_id = user.id
+    username = user.name
+    avatar = user.display_avatar.url
+    await ctx.send(f'User found: {user_id} -- {username}\n{avatar}')
+
+@userinfo.error
+async def userinfo_error(ctx: commands.Context, error: commands.CommandError):
+    if isinstance(error, commands.BadArgument):
+        return await ctx.send('Couldn\'t find that user.')
+    else:
+        traceback.print_exception(type(error), error, error.__traceback__)
+
+class ChannelOrMemberConverter(commands.Converter):
+    async def convert(self, ctx: commands.Context, argument: str):
+        member_converter = commands.MemberConverter()
+        try:
+            member = await member_converter.convert(ctx, argument)
+        except commands.MemberNotFound:
+            pass
+        else:
+            return member
+
+        textchannel_converter = commands.TextChannelConverter()
+        try:
+            channel = await textchannel_converter.convert(ctx, argument)
+        except commands.ChannelNotFound:
+            pass
+        else:
+            return channel
+
+        raise commands.BadArgument(f'No Member or TextChannel could be converted from "{argument}"')
+
+@bot.command()
+async def notify(ctx: commands.Context, target: ChannelOrMemberConverter):
+    await ctx.send(f'Hello, {target.name}!')
+
+@bot.command()
+async def ignore(ctx: commands.Context, target: typing.Union[discord.Member, discord.TextChannel]):
+    if isinstance(target, discord.Member):
+        await ctx.send(f'Member found: {target.mention}, adding them to the ignore list.')
+    elif isinstance(target, discord.TextChannel):
+        await ctx.send(f'Channel found: {target.mention}, adding it to the ignore list.')
+
+@bot.command()
+async def multiply(ctx: commands.Context, number: int, maybe: bool):
+    if maybe is True:
+        return await ctx.send(number * 2)
+    await ctx.send(number * 5)
+
+@bot.command()
+async def reduccion_la_contaminacion(ctx):
+    await ctx.send(f'La reducción de la contaminación es crucial para proteger nuestro planeta y nuestra salud. Aquí tienes algunas estrategias efectivas:\n\n'
+                   'En casa:\n'
+                   'Ahorrar energía: Apagar luces y dispositivos electrónicos cuando no se usan, y optar por bombillas LED.\n\n'
+                   'Reciclar y reutilizar: Clasificar los residuos y dar nueva vida a objetos usados.\n\n'
+                   'Reducir el consumo de plásticos: Usar bolsas reutilizables, botellas de agua de vidrio o metal y evitar productos con empaques excesivos.\n\n'
+                   'En el transporte:\n'
+                   'Usar bicicletas o caminar: Esto no solo reduce emisiones, sino que mejora la salud.\n\n'
+                   'Compartir el coche o usar transporte público: Menos vehículos en las calles significa menos contaminación.\n\n'
+                   'Optar por vehículos eléctricos o híbridos: Emiten menos contaminantes que los motores de combustión tradicionales.\n\n'
+                   'En la comunidad:\n'
+                   'Plantar árboles: Los árboles filtran el aire y absorben dióxido de carbono.\n\n'
+                   'Participar en limpiezas locales: Ayuda a mantener los espacios libres de basura.\n\n'
+                   'Crear conciencia: Educar a otros sobre prácticas sostenibles.\n\n'
+                   'En el consumo:\n'
+                   'Elegir productos locales: Reduce la huella de carbono asociada al transporte.\n\n'
+                   'Adoptar una dieta sostenible: Reducir el consumo de carne y optar por más alimentos vegetales.\n\n'
+                   'Evitar el desperdicio: Comprar solo lo necesario y reutilizar sobras.')
+
+bot.run(TOKEN)
